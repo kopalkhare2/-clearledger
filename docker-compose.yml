@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: clearledger-postgres
+    environment:
+      POSTGRES_DB: clearledger
+      POSTGRES_USER: clearledger
+      POSTGRES_PASSWORD: clearledger
+    ports:
+      - "5432:5432"
+    volumes:
+      - clearledger_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clearledger -d clearledger"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  clearledger_pgdata:

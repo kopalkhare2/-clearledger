@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: clearledger
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/v1/audit/trial-balance
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: clearledger-db
+          property: jdbcUrl
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: clearledger-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: clearledger-db
+          property: password
+
+databases:
+  - name: clearledger-db
+    plan: free
+    databaseName: clearledger
+    user: clearledger
