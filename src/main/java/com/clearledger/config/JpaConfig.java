@@ -15,8 +15,9 @@ public class JpaConfig {
 
     /**
      * Ensures any DataSource URL provided by platform environments (such as Render's
-     * postgresql:// connection strings) is automatically prefixed with 'jdbc:'
-     * so that the PostgreSQL JDBC driver and Flyway accept it.
+     * postgresql://user:pass@host:port/db connection strings) is properly converted
+     * into a standard JDBC URL (jdbc:postgresql://host:port/db) and credentials are
+     * set on DataSourceProperties so that the PostgreSQL JDBC driver and Flyway connect cleanly.
      */
     @Bean
     public static BeanPostProcessor dataSourcePropertiesPostProcessor() {
@@ -24,9 +25,35 @@ public class JpaConfig {
             @Override
             public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
                 if (bean instanceof DataSourceProperties properties) {
-                    String url = properties.getUrl();
-                    if (url != null && !url.startsWith("jdbc:")) {
-                        properties.setUrl("jdbc:" + url);
+                    String rawUrl = properties.getUrl();
+                    if (rawUrl != null && (rawUrl.startsWith("postgresql://") || rawUrl.startsWith("postgres://") || rawUrl.contains("@"))) {
+                        try {
+                            String uriString = rawUrl.startsWith("jdbc:") ? rawUrl.substring(5) : rawUrl;
+                            java.net.URI uri = java.net.URI.create(uriString);
+                            String host = uri.getHost();
+                            int port = uri.getPort();
+                            String path = uri.getPath();
+                            String userInfo = uri.getUserInfo();
+
+                            if (host != null) {
+                                String cleanJdbcUrl = "jdbc:postgresql://" + host + (port > 0 ? ":" + port : "") + (path != null ? path : "");
+                                properties.setUrl(cleanJdbcUrl);
+                            }
+
+                            if (userInfo != null) {
+                                String[] parts = userInfo.split(":", 2);
+                                if (properties.getUsername() == null || properties.getUsername().isBlank() || "clearledger".equals(properties.getUsername())) {
+                                    properties.setUsername(parts[0]);
+                                }
+                                if (parts.length > 1 && (properties.getPassword() == null || properties.getPassword().isBlank() || "clearledger".equals(properties.getPassword()))) {
+                                    properties.setPassword(parts[1]);
+                                }
+                            }
+                        } catch (Exception e) {
+                            if (!rawUrl.startsWith("jdbc:")) {
+                                properties.setUrl("jdbc:" + rawUrl);
+                            }
+                        }
                     }
                 }
                 return bean;
